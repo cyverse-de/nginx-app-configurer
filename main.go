@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strings"
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/gorilla/mux"
@@ -50,6 +51,8 @@ func InitApp(configdir, templatefilepath string, dckr *docker.Client, m *regexp.
 
 	return &App{
 		ConfigDir:        configdir,
+		Docker:           dckr,
+		Matcher:          m,
 		TemplateFilePath: templatefilepath,
 		Template:         tmpl,
 	}, nil
@@ -126,13 +129,13 @@ func (a *App) Add(w http.ResponseWriter, r *http.Request) {
 	jsonpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.json", change.Identifier))
 	configpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.conf", change.Identifier))
 	if _, err = os.Stat(jsonpath); err == nil {
-		err = errors.Wrapf(err, "path exists already %s", jsonpath)
+		err = fmt.Errorf("path exists already %s", jsonpath)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if _, err = os.Stat(configpath); err == nil {
-		err = errors.Wrapf(err, "path exists already %s", configpath)
+		err = fmt.Errorf("path exists already %s", configpath)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -324,8 +327,18 @@ func (a *App) SignalContainers() error {
 
 	for _, container := range containers {
 		signal := false
+		// Each container can have multiple names (apparently), so check them
+		// all.
 		for _, name := range container.Names {
-			if a.Matcher.MatchString(name) {
+			var n string
+			fmt.Println(name)
+			if strings.HasPrefix(name, "/") {
+				n = strings.TrimPrefix(name, "/")
+			} else {
+				n = name
+			}
+			if a.Matcher.MatchString(n) {
+				fmt.Println("matches")
 				signal = true
 			}
 		}
@@ -334,7 +347,9 @@ func (a *App) SignalContainers() error {
 				ID:     container.ID,
 				Signal: docker.SIGHUP,
 			}
-			return a.Docker.KillContainer(killopts)
+			if err = a.Docker.KillContainer(killopts); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

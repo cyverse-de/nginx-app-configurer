@@ -1,0 +1,20 @@
+version: '2'
+services:
+    notebook:
+        image: jupyter/minimal-notebook
+        container_name: notebook
+        command:
+            - start-notebook.sh
+            - "--NotebookApp.token=''"
+            - "--NotebookApp.base_url='${BASE_URL_PATH}'"
+            - "--NotebookApp.allow_origin='http://${ORIGIN_HOST}:${ORIGIN_PORT}'"
+        ports:
+            - "8888"
+
+    nginx:
+        image: nginx
+        container_name: nginx
+        volumes:
+            - ./conf.d:/etc/nginx/conf.d
+        ports:
+            - "${ORIGIN_PORT}:80"
