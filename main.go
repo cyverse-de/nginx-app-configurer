@@ -71,7 +71,7 @@ func (a *App) GenerateConfig(c *ChangeRequest) ([]byte, error) {
 
 // ChangeRequest is the format for the requests sent to the service.
 type ChangeRequest struct {
-	Identifier string `json:"identifier"`
+	Identifier string `json:"identifier"` // Only used for creating the config.
 	URL        string `json:"url"`
 	Host       string `json:"host"` // Parsed out of the URL if it's not set.
 	Port       string `json:"port"` // Parse out of the URL if it's not set.
@@ -166,6 +166,9 @@ func (a *App) Add(w http.ResponseWriter, r *http.Request) {
 
 // Update modifies a configuration based on the incoming JSON.
 func (a *App) Update(w http.ResponseWriter, r *http.Request) {
+	v := mux.Vars(r)
+	identifier := v["identifier"]
+
 	change, err := parsebody(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -184,8 +187,8 @@ func (a *App) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.json", change.Identifier))
-	configpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.conf", change.Identifier))
+	jsonpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.json", identifier))
+	configpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.conf", identifier))
 	if _, err = os.Stat(jsonpath); os.IsNotExist(err) {
 		err = errors.Wrapf(err, "path does not exist: %s", jsonpath)
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -222,16 +225,14 @@ func (a *App) Update(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Get returns the existing configuration based on the incoming JSON.
+// Get returns the configuration based identifier parsed out of the URL.
 func (a *App) Get(w http.ResponseWriter, r *http.Request) {
-	// Parse the body of the request.
-	change, err := parsebody(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	var err error
 
-	jsonpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.json", change.Identifier))
+	v := mux.Vars(r)
+	identifier := v["identifier"]
+
+	jsonpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.json", identifier))
 	if _, err = os.Stat(jsonpath); os.IsNotExist(err) {
 		err = errors.Wrapf(err, "path does not exist: %s", jsonpath)
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -260,25 +261,23 @@ func (a *App) Get(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Delete removes an existing configuration based on the incoming JSON.
+// Delete removes a configuration based on the identifier parsed out of the URL.
 func (a *App) Delete(w http.ResponseWriter, r *http.Request) {
-	// Parse the body of the request.
-	change, err := parsebody(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	var err error
 
-	jsonpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.json", change.Identifier))
+	v := mux.Vars(r)
+	identifier := v["identifier"]
+
+	jsonpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.json", identifier))
 	jsonpathexists := true
 
-	configpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.conf", change.Identifier))
+	configpath := path.Join(a.ConfigDir, fmt.Sprintf("%s.conf", identifier))
 	configpathexists := true
 
 	if _, err = os.Stat(jsonpath); os.IsNotExist(err) {
 		jsonpathexists = false
 	}
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		err = errors.Wrapf(err, "error checking file %s", jsonpath)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -287,7 +286,7 @@ func (a *App) Delete(w http.ResponseWriter, r *http.Request) {
 	if _, err = os.Stat(configpath); os.IsNotExist(err) {
 		configpathexists = false
 	}
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		err = errors.Wrapf(err, "error checking file %s", configpath)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -309,10 +308,12 @@ func (a *App) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err = a.SignalContainers(); err != nil {
-		err = errors.Wrap(err, "error HUPing container(s)")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if jsonpathexists || configpathexists {
+		if err = a.SignalContainers(); err != nil {
+			err = errors.Wrap(err, "error HUPing container(s)")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
