@@ -18,3 +18,18 @@ services:
             - ./conf.d:/etc/nginx/conf.d
         ports:
             - "${ORIGIN_PORT}:80"
+
+    configurer:
+        image: discoenv/nginx-app-configurer
+        command:
+            - "--regex"
+            - "nginx"
+            - "--template"
+            - "/go/src/github.com/cyverse-de/nginx-app-configurer/examples/no-ssl/no-ssl.tmpl"
+        volumes:
+            - ./conf.d:/etc/nginx/conf.d
+            - /var/run/docker.sock:/var/run/docker.sock
+        ports:
+            - "9091:8080"
+        depends_on:
+            - nginx
