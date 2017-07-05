@@ -7,7 +7,7 @@ services:
             - start-notebook.sh
             - "--NotebookApp.token=''"
             - "--NotebookApp.base_url='${BASE_URL_PATH}'"
-            - "--NotebookApp.allow_origin='http://${ORIGIN_HOST}:${ORIGIN_PORT}'"
+            - "--NotebookApp.allow_origin='*'"
         ports:
             - "8888"
 
