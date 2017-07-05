@@ -1,0 +1,50 @@
+version: '2'
+services:
+    notebook:
+        image: jupyter/minimal-notebook
+        container_name: notebook
+        command:
+            - start-notebook.sh
+            - "--NotebookApp.token=''"
+            - "--NotebookApp.base_url='${BASE_URL_PATH}'"
+            - "--NotebookApp.allow_origin='*'"
+        ports:
+            - "8888"
+
+    proxy:
+        image: discoenv/cas-proxy:master
+        container_name: proxy
+        command:
+            - "--backend-url"
+            - http://notebook:8888
+            - "--cas-base-url"
+            - ${CAS_URL}
+            - "--frontend-url"
+            - http://${ORIGIN_HOST}:${ORIGIN_PORT}${BASE_URL_PATH}
+        ports:
+            - "8080"
+        depends_on:
+            - notebook
+
+    nginx:
+        image: nginx
+        container_name: nginx
+        volumes:
+            - ./conf.d:/etc/nginx/conf.d
+        ports:
+            - "${ORIGIN_PORT}:80"
+
+    configurer:
+        image: discoenv/nginx-app-configurer
+        command:
+            - "--regex"
+            - "nginx"
+            - "--template"
+            - "/go/src/github.com/cyverse-de/nginx-app-configurer/examples/no-ssl/no-ssl.tmpl"
+        volumes:
+            - ./conf.d:/etc/nginx/conf.d
+            - /var/run/docker.sock:/var/run/docker.sock
+        ports:
+            - "9091:8080"
+        depends_on:
+            - nginx
