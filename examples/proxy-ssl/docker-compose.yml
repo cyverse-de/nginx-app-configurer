@@ -40,6 +40,7 @@ services:
             - ./conf.d:/etc/nginx/conf.d
             - ${HOST_NGINX_SSL_KEY_PATH}:${NGINX_SSL_KEY_PATH}
             - ${HOST_NGINX_SSL_CERT_PATH}:${NGINX_SSL_CERT_PATH}
+            - ${HOST_NGINX_CA_CERT_PATH}:${NGINX_CA_CERT_PATH}
         ports:
             - "${ORIGIN_PORT}:443"
 

@@ -3,6 +3,7 @@ server {
 
   ssl_certificate /etc/ssl/fake.crt;
   ssl_certificate_key /etc/ssl/fake.key;
+  proxy_ssl_trusted_certificate /etc/ssl/trusted.crt;
 
   location /apps/{{ .Identifier}} {
     proxy_pass         {{ .URL }};
@@ -14,5 +15,8 @@ server {
     proxy_set_header   X-Real-IP $remote_addr;
     proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header   X-Forwarded-Proto $scheme;
+    proxy_ssl_verify   on;
+    proxy_ssl_verify_depth  2;
+    proxy_ssl_session_reuse on;
   }
 }
